@@ -11,6 +11,7 @@ Variables
 public key
 private key
 user address
+dict/map of all the addresses
 
 Functions
 create_user_address ( public key ): 
