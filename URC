@@ -2,14 +2,10 @@ contains name, address and type
 Upon registration, each requester or worker does not need to submit his/her true identity, and will be assigned with a key pair: a “public key” and a “private key”. The global URC contract produces a user’s address by generating a hash with the public key
 
 
-1. User signs up
-
-2. We give them a public key and a private key for the blockchain
+1. User signs up with they Ethereum public key and private key (that is how they login)
 3. We generate the user's address by hashing the public key. (separate from the blockchain priv, pub keys).
 
 Variables
-public key
-private key
 user address
 dict/map of all the addresses
 
