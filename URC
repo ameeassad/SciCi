@@ -3,7 +3,7 @@ Upon registration, each requester or worker does not need to submit his/her true
 
 
 1. User signs up with they Ethereum public key and private key (that is how they login)
-3. We generate the user's address by hashing the public key. (separate from the blockchain priv, pub keys).
+2. We generate the user's address by hashing the public key. (separate from the blockchain priv, pub keys).
 
 Variables
 user address
