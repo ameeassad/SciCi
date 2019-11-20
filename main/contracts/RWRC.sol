@@ -2,17 +2,17 @@
 // This is going to be the file for RWRC
 //
 
-contract RWRC(address owner_address, uint taskid, uint number_of_verifiers) {
+contract RWRC(uint taskid, uint number_of_verifiers) {
 	
-	uint status = 0 // 0  = Unfinished, 1 = Finished
+	enum State { Unadopted, Waiting_for_verifier, Verified, Completed} 
 	address owner;
 	uint balance;
 	uint verifiers;
-	uint[] list;
+	address[] verifiersList;
 		
 	constructor() public {	
-		tid = taskid
-		owner = owner_address;
+		tid = taskid;
+		owner = msg.sender;
 		balance = msg.value;
 		verifiers = number_of_verifiers;
 	}
@@ -22,15 +22,15 @@ contract RWRC(address owner_address, uint taskid, uint number_of_verifiers) {
 		
 	function verify() public boolean{
 		
-		uint sender = msg.sender
-		
-		for ( uint i =0; list.length; i++ )
-			if list[i] == sender;
+		for (uint i = 0; verifierList.length; i++){
+			if (list[i] == msg.sender){
 				return False;
+			}
+		}
 		
-		list.push(msg.sender)
+		list.push(msg.sender);
 		
-		return True;
+		return true;
 	}
 
 }
