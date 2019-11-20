@@ -1,5 +1,6 @@
 pragma solidity ^0.5.0;
 /**
+* https://kauri.io/article/124b7db1d0cf4f47b414f8b13c9d66e2/remix-ide-your-first-smart-contract 
 * @title Bounties
 * @author Joshua Cassidy- <joshua.cassidy@consensys.net>
 * @dev Simple smart contract which allows any user to issue a bounty in ETH linked to requirements
