@@ -1,37 +1,42 @@
+pragma solidity ^0.5.11;
 
-// This is going to be the file for RWRC
-//
+contract RWRC{
 
-contract RWRC(uint taskid, uint number_of_verifiers) {
-	
-	enum State { Unadopted, Waiting_for_verifier, Verified, Completed} 
+	enum State { Unadopted, Waiting_for_verifier, Verified, Completed}
 	address owner;
-	uint balance;
-	uint verifiers;
+	uint256 tid;
+	// deadline 
+	uint256 price;
+	uint256 stake; 
+	uint256 verifiers;
 	address[] verifiersList;
-		
-	constructor() public {	
+
+	constructor(uint256 taskid, uint256 number_of_verifiers, uint256 pay, uint256 stake_amount) public {
 		tid = taskid;
 		owner = msg.sender;
-		balance = msg.value;
+		price = pay;
+		stake = stake_amount; 
 		verifiers = number_of_verifiers;
 	}
-	
+
 	// When a verfier verifies a task, he is added to a list, once the length of the list of addresses of verifiers
 	// corresponds to the required number of verifiers explicitly asked by the requester
-		
-	function verify() public boolean{
-		
-		for (uint i = 0; verifierList.length; i++){
-			if (list[i] == msg.sender){
-				return False;
+
+	function add_verifier() public returns(bool){
+
+		for (uint i = 0; i < verifiersList.length; i++){
+			if (verifiersList[i] == msg.sender){
+				return false;
 			}
 		}
-		
-		list.push(msg.sender);
-		
+
+		verifiersList.push(msg.sender);
 		return true;
 	}
+
+	// transfer 
+	// validate task 
+	// adopted by a worker 
 
 }
 

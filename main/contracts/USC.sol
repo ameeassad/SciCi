@@ -12,6 +12,8 @@ contract registration{
     uint256 public verifierCount = 0;
     uint256 public taskCount = 0;
     uint256 public transactionCount = 0;
+    // list of tasks 
+
 
     mapping(address => Actor) public actors;
     mapping(address => Tasker) public taskers;
