@@ -12,7 +12,7 @@ contract registration{
     uint256 public verifierCount = 0;
     uint256 public taskCount = 0;
     uint256 public transactionCount = 0;
-    // list of tasks 
+    // list of tasks
 
 
     mapping(address => Actor) public actors;
@@ -30,6 +30,7 @@ contract registration{
 
     struct Tasker {
         address payable public_addr;
+        // list of addresses of task
         uint num_job_done;
         uint num_job_fail;
     }
