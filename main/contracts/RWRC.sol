@@ -5,6 +5,8 @@ contract RWRC{
 	enum State {Unadopted, Adopted, Waiting_for_verifier, Verified, Not_Verified, Completed};
 	State default_state = State.Unadopted;
     enum Level {High, Low};
+
+	// Get rid of difficulty level
 	Level level = Level.Low; 
 
 	address payable owner;
@@ -12,10 +14,10 @@ contract RWRC{
 	// TODO deadline variable 
 	uint256 vrf_num = 0; 
 	uint256 req_stake;  // requester stake
-	uint256 wrk_stake;  // worker stake 
+	uint256 wrk_stake;  // tasker stake 
 	uint256 vrf_stake;  // pool of verifier stake
 	uint256 vrf_ans = 0; // the number of verifier answered
-	address payable worker;
+	address payable tasker;
 	string description;
 	string answer;
 
@@ -26,13 +28,13 @@ contract RWRC{
 		public address payable public_addr; 
 	}
 
-	address usc_addr;
-    uint amount;
+	Registration reg; 
 
-	constructor(uint256 taskid, uint256 dif_level, uint256 stake_amount, string memory des) public {
+	event Transfer(address _from, address _totasker, address _toverifier)
+
+	constructor(uint256 taskid, uint256 dif_level, string memory des, address regis_addr) public {
 		tid = taskid;
 		owner = msg.sender;
-		stake = stake_amount;
 		description = des;
 
 		if (dif_level == 1){
@@ -41,8 +43,8 @@ contract RWRC{
 			level = Level.Low; 
 		}
 
-		USC uc = USC(usc_addr)
-		uc.updatetaskcount();
+		reg = Registration(regis_addr)
+		reg.addTaskCount():
 		depositFunds(); 
 	}
 
@@ -52,48 +54,52 @@ contract RWRC{
     }
 
     function depositFunds() payable{
-        amount += msg.value;
+        req_stake += msg.value;
     }
 
-	// worker adopt a task
+	// tasker adopt a task
 	// TODO: interfacing with registration contract 
-	function worker_adopt(uint256 stake) public returns(bool){
-		require(owner != msg.sender, "error: requester as worker");
+	function tasker_adopt(uint256 stake) public payable returns(bool){
+		require(owner != msg.sender, "error: requester as tasker");
 
-		// setup worker to task
-		worker = msg.sender;
-		wrk_stake = stake; 
+		// setup tasker to task
+		tasker = msg.sender;
+		//TODO transfer stake from worker
+		wrk_stake += msg.value;
 		default_state = State.Adopted;
 		return true;
 	}
 
-	// Worker complete task 
-	function complete_task(string memory ans) public returns(bool){
-		require(owner != msg.sender, "error: requester as worker");
+	// tasker complete task 
+	function complete_task(string memory ans) public returns(bool) {
+		require(owner != msg.sender, "error: requester as tasker");
 
-		// worker has completed task
+		// tasker has completed task
 		default_state = State.Waiting_for_verifier;
-		answer = ans;
+		answer = sha3(ans);
+		// emit answer ? 
 		return true;
 	}
 
-	function verifier_adopt(uint256 stake) public returns(bool){
-		require(worker != msg.sender, "error: worker as verifier");
+	function verifier_adopt(uint256 stake) public returns(bool) { 
+		require(tasker != msg.sender, "error: tasker as verifier");
 		
 		//setup verifier
 		if (vrf_num <= 3){
 			verifiers[vrf_num-1] = new Verifier(false, false, msg.sender);
 			vrf_num++;
-			vrf_stake += stake;
+			vrf_stake += msg.value;
 		}
 	}
 
 	// Verifier does not approve the answer
 	function verify_task(bool approve_choice) public returns(bool){
-		require(msg.sender != worker, "error: worker as requester");
+		require(msg.sender != tasker, "error: tasker as requester");
 
 		// TODO: check reputation in registration contract 
 		vrf_ans ++; 
+
+		// change this mapping 
 		verifiers[vrf_ans].done = true; 
 		verifiers[vrf_ans].approved = approve_choice; 
 
@@ -109,23 +115,24 @@ contract RWRC{
 			}
 
 			if (concensus == false){
-				// worker is disapproved
+				// tasker is disapproved
 
-		        // penalized consensus minority	
 				if (temp_addr != address(0x0)){
-					// transfer worker stack to majority
-				}
+					dis_min(temp_addr);
+				} else {
+					dis_all();
+				} 
 
-				handle_worker_failure();
+				handle_tasker_failure(); // reset the cnotract 
 				
-				// worker stake to requester stake
+				// tasker stake to requester stake
 			} else {
-				// worker is approved
+				// tasker is approved
 
-
-				// penalized consensus minority
 				if (temp_addr != address(0x0)){
-					// stack pool goes to the majority 
+					app_min(temp_addr); // stack pool goes to the majority
+				} else {
+					app_all();
 				}
 
 			}
@@ -157,33 +164,66 @@ contract RWRC{
 		return result; 
 	}
 
-
 	// helper 
-	function handle_worker_failure() public returns(bool){
-		require(default_state == State.Not_Verified, "error: handle_worker_failure");
-		// transfer wrk stakes to requester
+	function handle_tasker_failure() public returns(bool){
+		require(default_state == State.Not_Verified, "error: handle_tasker_failure");
+
+		// reset all variables
+		default_state = State.Unadopted; 
+		wrk_stake = 0;
+		vrf_stake = 0;
+		vrf_num = 0;
+		vrf_ans = 0; 
+
+		// empty the array 
+
 	}
 
+	function transfer_checked(address _to, uint256 _amount) public payable {
+		if (address(this).balance > _amount ) throw;
+        _to.transfer(_amount);
+    }
 
-	event Transfer(address _from, address _toworker, address _toverifier)
-    
-	// requester to worker/verifier 
-	function transferApproved(){
-		
-		worker.transfer(wrk_stake)
-		worker.transfer((8*amount)/10);
-		verifier.transfer((2*amount)/10); 
-		
-		emit transfer(address(this) , worker, verifier)
-		// TODO change percentage depending on no verifiers
-        
+	// approved, all app
+	// calculation for all the transfers 
+	function app_all() private payable{
+		// stake refund back
+		transfer_checked(tasker, req_stake*7/10);
+		uint256 vrf_pay = req_stake/10 + vrf_stake/3;
+		for(int i = 0; i < vrf_num; i++){
+			transfer_checked(verifiers[i].public_addr, vrf_pay);
+		}
 	}
-	
-	// requester 
-	function transferRejected(){
-	   verifier.transfer(wrk_stake)
-	   //TODO add multiple verifiers
+
+	function app_min(address min) private payable{
+        uint256 temp = vrf_stake/2;
+        uint256 comb_stake = (req_stake/10) + temp;
+        for (uint i = 0; i < vrf_num; i++){
+            if ((verifiers[i]).public_addr != min){
+                transfer_checked((verifiers[i]).public_addr, comb_stake);    
+            }
+        }
+
+		transfer_checked(tasker, req_stake*8/10);
+    }
+
+	function dis_min(address min) private payable{
+		// workers stake + vrf_stake 
+		uint256 temp = wrk_stake + vrf_stake;
+		for(uint256 i = 0; i < vrf_num; i++){
+			if (verifiers[i].public_addr != min){
+				transfer_checked(verifiers[i].public_addr, temp/2);
+			}
+		}
 	}
+
+	function dis_all() private {
+	    uint256 comb_stake = (wrk_stake+vrf_stake)/3;
+		for(uint256 i = 0; i < vrf_num; i++){
+			transfer_checked(verifiers[i].public_addr, comb_stake);
+		}
+    }
+
 
 }
 
