@@ -2,12 +2,8 @@ pragma solidity ^0.5.11;
 
 contract RWRC{
 
-	enum State {Unadopted, Adopted, Waiting_for_verifier, Verified, Not_Verified, Completed};
-	State default_state = State.Unadopted;
-    enum Level {High, Low};
-
-	// Get rid of difficulty level
-	Level level = Level.Low; 
+	enum State {Unfunded, Unadopted, Adopted, Waiting_for_verifier, Verified, Not_Verified, Completed};
+	State default_state = State.Unfunded;
 
 	address payable owner;
 	uint256 tid;
@@ -19,29 +15,24 @@ contract RWRC{
 	uint256 vrf_ans = 0; // the number of verifier answered
 	address payable tasker;
 	string description;
-	string answer;
+	bytes32 answer_hash;
 
-	Verifier[] verifiers; 
+	Verifier[] verifiers;
+	Registration reg;
+
 	struct Verifier{
 		public bool done;
 		public bool approved;
 		public address payable public_addr; 
 	}
 
-	Registration reg; 
+	event Transfer(address _from, address _totasker, address _toverifier);
+	event Task_completed(address wrker, bytes32 answer);
 
-	event Transfer(address _from, address _totasker, address _toverifier)
-
-	constructor(uint256 taskid, uint256 dif_level, string memory des, address regis_addr) public {
+	constructor(uint256 taskid, string memory des, address regis_addr) public {
 		tid = taskid;
 		owner = msg.sender;
 		description = des;
-
-		if (dif_level == 1){
-			level = Level.High;
-		} else {
-			level = Level.Low; 
-		}
 
 		reg = Registration(regis_addr)
 		reg.addTaskCount():
@@ -49,13 +40,18 @@ contract RWRC{
 	}
 
 	// FALL BACK FUNCTION TODO
-	function () public payable{
+	function () public payable {
         depositFunds();
     }
 
-    function depositFunds() payable{
+    function depositFunds() payable {
         req_stake += msg.value;
     }
+
+	// donors donate 
+	function donate() payable{
+		req_stake += msg.value; 
+	}
 
 	// tasker adopt a task
 	// TODO: interfacing with registration contract 
@@ -68,6 +64,7 @@ contract RWRC{
 		wrk_stake += msg.value;
 		default_state = State.Adopted;
 		return true;
+
 	}
 
 	// tasker complete task 
@@ -76,8 +73,8 @@ contract RWRC{
 
 		// tasker has completed task
 		default_state = State.Waiting_for_verifier;
-		answer = sha3(ans);
-		// emit answer ? 
+		answer_hash = keccak256(ans);
+
 		return true;
 	}
 
@@ -85,15 +82,15 @@ contract RWRC{
 		require(tasker != msg.sender, "error: tasker as verifier");
 		
 		//setup verifier
-		if (vrf_num <= 3){
-			verifiers[vrf_num-1] = new Verifier(false, false, msg.sender);
+		if (vrf_num < 3){
+			verifiers[vrf_num] = new Verifier(false, false, msg.sender);
 			vrf_num++;
 			vrf_stake += msg.value;
 		}
 	}
 
-	// Verifier does not approve the answer
-	function verify_task(bool approve_choice) public returns(bool){
+	// Verifier does not approve the answer_hash
+	function verify_task(bool approve_choice) public returns(bool) {
 		require(msg.sender != tasker, "error: tasker as requester");
 
 		// TODO: check reputation in registration contract 
@@ -107,7 +104,8 @@ contract RWRC{
 		if (vrf_ans == 3){
 
 			bool concensus = find_consensus()
-			address temp_addr = address(0x0);
+			address payable temp_addr = address(0x0);
+
 			for(int i = 0; i < vrf_num; i++){
 				if (verifiers[i].approved != concensus){
 					temp_addr = verifiers[i].public_addr;
@@ -115,20 +113,14 @@ contract RWRC{
 			}
 
 			if (concensus == false){
-				// tasker is disapproved
-
 				if (temp_addr != address(0x0)){
 					dis_min(temp_addr);
 				} else {
 					dis_all();
 				} 
 
-				handle_tasker_failure(); // reset the cnotract 
-				
-				// tasker stake to requester stake
+				handle_tasker_failure(); // reset the contract 
 			} else {
-				// tasker is approved
-
 				if (temp_addr != address(0x0)){
 					app_min(temp_addr); // stack pool goes to the majority
 				} else {
@@ -175,8 +167,8 @@ contract RWRC{
 		vrf_num = 0;
 		vrf_ans = 0; 
 
-		// empty the array 
-
+		reg.decreaseReputation(worker, 20, true);
+		worker = address(0x0);
 	}
 
 	function transfer_checked(address _to, uint256 _amount) public payable {
@@ -192,6 +184,7 @@ contract RWRC{
 		uint256 vrf_pay = req_stake/10 + vrf_stake/3;
 		for(int i = 0; i < vrf_num; i++){
 			transfer_checked(verifiers[i].public_addr, vrf_pay);
+			reg.increaseReputation(verifiers[i].public_addr, 20, false);	
 		}
 	}
 
@@ -200,8 +193,11 @@ contract RWRC{
         uint256 comb_stake = (req_stake/10) + temp;
         for (uint i = 0; i < vrf_num; i++){
             if ((verifiers[i]).public_addr != min){
-                transfer_checked((verifiers[i]).public_addr, comb_stake);    
-            }
+                transfer_checked((verifiers[i]).public_addr, comb_stake);
+				reg.increaseReputation(verifiers[i].public_addr, 20, false);
+            } else {
+				reg.decreaseReputation(verifiers[i].public_addr, 20, true);		
+			}
         }
 
 		transfer_checked(tasker, req_stake*8/10);
@@ -213,6 +209,9 @@ contract RWRC{
 		for(uint256 i = 0; i < vrf_num; i++){
 			if (verifiers[i].public_addr != min){
 				transfer_checked(verifiers[i].public_addr, temp/2);
+				reg.increaseReputation(verifiers[i].public_addr, 20, false);
+			}else{
+				reg.decreaseReputation(verifiers[i].public_addr, 20, true);	
 			}
 		}
 	}
@@ -221,6 +220,7 @@ contract RWRC{
 	    uint256 comb_stake = (wrk_stake+vrf_stake)/3;
 		for(uint256 i = 0; i < vrf_num; i++){
 			transfer_checked(verifiers[i].public_addr, comb_stake);
+			reg.increaseReputation(verifiers[i].public_addr, 20, false);
 		}
     }
 
