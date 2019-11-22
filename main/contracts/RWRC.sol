@@ -7,15 +7,16 @@ contract RWRC{
 
 	address payable owner;
 	uint256 tid;
-	// TODO deadline variable 
 	uint256 vrf_num = 0; 
 	uint256 req_stake;  // requester stake
 	uint256 wrk_stake;  // tasker stake 
 	uint256 vrf_stake;  // pool of verifier stake
 	uint256 vrf_ans = 0; // the number of verifier answered
+	uint256 set_pay;
 	address payable tasker;
 	string description;
 	bytes32 answer_hash;
+	uint deadline; 
 
 	Verifier[] verifiers;
 	Registration reg;
@@ -29,12 +30,14 @@ contract RWRC{
 	event Transfer(address _from, address _totasker, address _toverifier);
 	event Task_completed(address wrker, bytes32 answer);
 
-	constructor(uint256 taskid, string memory des, address regis_addr) public {
+	constructor(uint256 taskid, string memory des, address regis_addr, uint pay, uint duration) public {
 		tid = taskid;
 		owner = msg.sender;
 		description = des;
+		set_pay = pay;
+		deadline = now + duration; 
 
-		reg = Registration(regis_addr)
+		reg = Registration(regis_addr);
 		reg.addTaskCount():
 		depositFunds(); 
 	}
@@ -46,17 +49,27 @@ contract RWRC{
 
     function depositFunds() payable {
         req_stake += msg.value;
+
+		if (req_stake >= set_pay){
+			default_state = State.Unadopted;
+		}
     }
 
 	// donors donate 
 	function donate() payable{
-		req_stake += msg.value; 
+		req_stake += msg.value;
+
+		if (req_stake >= set_pay){
+			default_state = State.Unadopted;
+		}
+
 	}
 
 	// tasker adopt a task
 	// TODO: interfacing with registration contract 
 	function tasker_adopt(uint256 stake) public payable returns(bool){
 		require(owner != msg.sender, "error: requester as tasker");
+		require(default_state == State.Unadopted, "error: the task is ready for adoption"):
 
 		// setup tasker to task
 		tasker = msg.sender;
@@ -223,6 +236,14 @@ contract RWRC{
 			reg.increaseReputation(verifiers[i].public_addr, 20, false);
 		}
     }
+
+	function cancelTask() public {
+	   
+	    if ( now > deadline ){
+	       owner.transfer(req_stake);
+		   selfdestruct(owner); 
+	    }
+	}
 
 
 }

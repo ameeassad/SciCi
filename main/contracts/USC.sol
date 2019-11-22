@@ -5,7 +5,6 @@ contract Registration{
     
     address owner;
     address payable wallet;
-
     uint256 public actorCount = 0;
     uint256 public donorCount = 0;
     uint256 public taskerCount = 0;
@@ -25,9 +24,9 @@ contract Registration{
     struct Actor {
         address payable public_addr;
         bool donor;
-        bool requestor;
+        bool requester;
         bool tasker;
-        bool verifer;
+        bool verifier;
         uint reputation;
     }
 
@@ -64,46 +63,62 @@ contract Registration{
     }
 
     function registerDonor() public {
-        require(actors[msg.sender].public_addr == address(0x0), "Duplicate actors registration");
         require(donors[msg.sender].public_addr == address(0x0), "Duplicate registration");
 
-        donors[msg.sender] = Donor(msg.sender, 0);
-        donorCount += 1;
-        actors[msg.sender] = Actor(msg.sender, true, false, false, false, 100);
-        actorCount += 1;
+        if (actors[msg.sender].public_addr == address(0x0)){
+            actors[msg.sender] = Actor(msg.sender, false, true, false, false, 100);
+            actorCount += 1;
+        }else{
+            if (donors[msg.sender].public_addr == address(0x0)){
+                donors[msg.sender] = Donor(msg.sender, 0);
+                donorCount += 1;
+            }
+            actors[msg.sender].donor = true;
+        }
     }
 
     function registerTasker() public {
-        require(actors[msg.sender].public_addr == address(0x0), "Duplicate actors registration");
         require(taskers[msg.sender].public_addr == address(0x0), "Duplicate registration");
 
-        taskers[msg.sender] = Tasker(msg.sender, 0, 0);
-        taskerCount += 1;
-        actors[msg.sender] = Actor(msg.sender, false, true, false, false, 100);
-        actorCount += 1;
+        if (actors[msg.sender].public_addr == address(0x0)){
+            actors[msg.sender] = Actor(msg.sender, false, true, false, false, 100);
+            actorCount += 1;
+        }else{
+            if (taskers[msg.sender].public_addr == address(0x0)){
+                taskers[msg.sender] = Tasker(msg.sender, 0, 0);
+                taskerCount += 1;
+            }
+            actors[msg.sender].tasker = true;
+        }
+
     }
 
     function registerReq() public {
-        require(actors[msg.sender].public_addr == address(0x0), "Duplicate actors registration");
         require(requesters[msg.sender].public_addr == address(0x0), "Duplicate registration");
 
-        requesters[msg.sender] = Requester(msg.sender, 0);
-        requesterCount += 1;
-        actors[msg.sender] = Actor(msg.sender, false, false, true, false, 100);
-        actorCount += 1;
+        if (actors[msg.sender].public_addr == address(0x0)){
+            actors[msg.sender] = Actor(msg.sender, false, true, false, false, 100);
+            actorCount += 1;
+        }else{
+            if (requesters[msg.sender].public_addr == address(0x0)){
+                requesters[msg.sender] = Requester(msg.sender, 0);
+                requesterCount += 1;
+            }
+            actors[msg.sender].requester = true;
+        }
     }
 
     function registerVerifier(address addr) public {
         require(verifiers[addr].public_addr == address(0x0), "Duplicate registration");
 
         verifiers[addr] = Verifier(address(uint160(addr)), 0);
+        actors[addr].verifier = true;
         verifierCount += 1;
-        actors[addr] = Actor(address(uint160(addr)), false, false, false, true, 100);
-        actorCount += 1;
     }
 
     function removeVerifier(address addr) public {
         require(verifiers[addr].public_addr != address(0x0), "Duplicate registration");
+        actors[addr].verifier = false;
         delete verifiers[addr];
     }
 
@@ -142,9 +157,9 @@ contract Registration{
     function increaseReputation(address addr, uint inc, bool isWorker) public{
         Actor memory actor = actors[addr];
         actor.reputation += inc;
-        
+
         //kind equals 0 if addr belongs to tasker/worker
-        if ( isWorker && actor.reputation > threshold){
+        if ( actor.verifier == false && isWorker && actor.reputation > threshold){
             registerVerifier(addr);
         }
     }
@@ -170,6 +185,5 @@ contract Registration{
         Tasker storage tasker = taskers[addr];
         tasker.num_job_fail += 1;
     }
-
 
 }
