@@ -68,6 +68,9 @@ contract Registration{
         if (actors[msg.sender].public_addr == address(0x0)){
             actors[msg.sender] = Actor(msg.sender, false, true, false, false, 100);
             actorCount += 1;
+
+            donors[msg.sender] = Donor(msg.sender, 0);
+            donorCount += 1;
         }else{
             if (donors[msg.sender].public_addr == address(0x0)){
                 donors[msg.sender] = Donor(msg.sender, 0);
@@ -83,6 +86,9 @@ contract Registration{
         if (actors[msg.sender].public_addr == address(0x0)){
             actors[msg.sender] = Actor(msg.sender, false, true, false, false, 100);
             actorCount += 1;
+
+            taskers[msg.sender] = Tasker(msg.sender, 0, 0);
+            taskerCount += 1;
         }else{
             if (taskers[msg.sender].public_addr == address(0x0)){
                 taskers[msg.sender] = Tasker(msg.sender, 0, 0);
@@ -99,6 +105,9 @@ contract Registration{
         if (actors[msg.sender].public_addr == address(0x0)){
             actors[msg.sender] = Actor(msg.sender, false, true, false, false, 100);
             actorCount += 1;
+
+            requesters[msg.sender] = Requester(msg.sender, 0);
+            requesterCount += 1;
         }else{
             if (requesters[msg.sender].public_addr == address(0x0)){
                 requesters[msg.sender] = Requester(msg.sender, 0);
