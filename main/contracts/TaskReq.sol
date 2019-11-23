@@ -1,5 +1,5 @@
 pragma solidity ^0.5.11;
-import "./Registration.sol";
+import "./registration.sol";
 
 contract TaskReq{
     address payable public owner;
