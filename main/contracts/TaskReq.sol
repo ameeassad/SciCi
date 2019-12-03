@@ -1,5 +1,6 @@
 pragma solidity ^0.5.11;
 import "./registration.sol";
+import "./ERC20.sol";
 
 contract TaskReq{
     address payable public owner;
@@ -20,6 +21,8 @@ contract TaskReq{
 	uint public deadline; 
     Registration reg;
 	Verifier[3] public verifiers;
+	ERC20 public tokens;
+	uint contract_balance; 
 
 
     //Removed public keyword in variabls below
@@ -32,10 +35,11 @@ contract TaskReq{
 	//event Transfer(address _from, address _totasker, address _toverifier);
 	//event Task_completed(address wrker, bytes32 answer);
 
-	constructor(string memory des, address regis_addr, uint pay, uint duration) public {
+	constructor(string memory des, address regis_addr, uint pay, uint duration, address erc20_addr) public {
 	    reg = Registration(regis_addr);
 	    
 	    require(reg.isRequester(msg.sender), "You are not registered to be a requester");
+	    tokens = ERC20(erc20_addr);
 	    tid = reg.addTaskCount();
 		owner = msg.sender;
 		description = des;
@@ -45,8 +49,12 @@ contract TaskReq{
 	}
 
 	// donors donate 
-	function donate() public payable{
-		req_stake += msg.value;
+	function donate(uint256 amount) public payable{
+		tokens._approve(msg.sender, address(this), amount);
+		tokens.transferFrom(msg.sender, address(this), amount);
+		
+		req_stake += amount;
+		contract_balance += amount; 
 		
 		if (req_stake >= set_pay){
 			default_state = State.Unadopted;
@@ -56,18 +64,24 @@ contract TaskReq{
 
 	// tasker adopt a task
 	// TODO: interfacing with registration contract 
-	function tasker_adopt() public payable returns(bool){
+	function tasker_adopt(uint256 amount) public payable returns(bool){
 	    //check if taskers
 	    require(reg.isTasker(msg.sender), "You are not registered to be a tasker");
 	    require(owner != address(0x0), "error: This task is adopted by another tasker");
 		require(owner != msg.sender, "error: requester as tasker");
 		require(default_state == State.Unadopted, "error: the task is not yet ready for adoption");
-		require(msg.value > 0, "error: stake has to be larger than zero");
+		require(amount > 0, "error: stake has to be larger than zero");
 
 		// setup tasker to task
 		tasker = msg.sender;
-		wrk_stake += msg.value;
+		wrk_stake += amount;
+		contract_balance += amount;
 		default_state = State.Adopted;
+		
+		// transfer ERC20 token
+		tokens._approve(msg.sender, address(this), amount);
+		tokens.transferFrom(msg.sender, address(this), amount);
+		
 		return true;
 
 	}
@@ -85,12 +99,12 @@ contract TaskReq{
 		return true;
 	}
 
-	function verifier_adopt() public payable returns(bool) {
+	function verifier_adopt(uint256 amount) public payable returns(bool) {
 	    require(default_state == State.Waiting_for_verifier, "error: State error");
 	    require(vrf_num < 3, "error: State error");
 	    require(reg.isVerifier(msg.sender), "You are not registered to be a verifier");
 		require(tasker != msg.sender, "error: tasker as verifier");
-		require(msg.value > 0, "error: Verifier stake cannot be zero");
+		require(amount > 0, "error: Verifier stake cannot be zero");
 		
 	    bool dup_verifier = false; 
 	    
@@ -107,7 +121,10 @@ contract TaskReq{
 		Verifier memory v = Verifier(false, false, msg.sender); 
 	    verifiers[vrf_num] = v;
 		vrf_num ++;
-		vrf_stake += msg.value;
+		vrf_stake += amount;
+		contract_balance += amount;
+		tokens._approve(msg.sender, address(this), amount);
+		tokens.transferFrom(msg.sender, address(this), amount);
 	}
 
 	// Verifier does not approve the answer_hash
@@ -135,6 +152,7 @@ contract TaskReq{
 		// Check if all verifier has answered, find consensus
 		if (vrf_ans == 3){
 
+            default_state = State.Not_Verified;
 			bool consensus = find_consensus();
 			address payable temp_addr = address(0x0);
 
@@ -199,15 +217,18 @@ contract TaskReq{
 		wrk_stake = 0;
 		vrf_stake = 0;
 		vrf_num = 0;
-		vrf_ans = 0; 
+		vrf_ans = 0;
 
-		reg.decreaseReputation(tasker, 20, true);
+		reg.decreaseReputation(tasker, 20, false);
 		tasker = address(0x0);
 	}
 
 	function transfer_checked(address payable _to, uint256 _amount) public payable {
-		if (address(this).balance < _amount ) revert();
-        _to.transfer(_amount);
+// 		if (address(this).balance < _amount ) revert();
+//         _to.transfer(_amount);
+        contract_balance -= _amount;
+		//tokens._approve(address(this), _to , _amount);
+		tokens.transfer(_to, _amount);
     }
 
 	// approved, all app
@@ -221,7 +242,7 @@ contract TaskReq{
 			reg.increaseReputation(verifiers[i].public_addr, 20, false);	
 		}
 		
-		transfer_checked(tasker, address(this).balance);
+		transfer_checked(tasker, contract_balance);
 	}
 
 	function app_min(address min) private {
@@ -238,7 +259,7 @@ contract TaskReq{
 			}
 			
         }
-		transfer_checked(tasker, address(this).balance);
+		transfer_checked(tasker, contract_balance);
     }
 
 	function dis_min(address min) private {
@@ -265,13 +286,15 @@ contract TaskReq{
 	function cancelTask() public payable{
 	   
 	    if ( now > deadline ){
-	       owner.transfer(req_stake);
+	       //owner.transfer(req_stake);
+	       tokens._approve(address(this), owner, tokens.balanceOf(address(this)));
+		   tokens.transferFrom(address(this), owner, tokens.balanceOf(address(this)));
 		   selfdestruct(owner);
 	    }
 	}
 	
 	function getContractBalance() public view returns(uint){
-	    return address(this).balance;
+	    return contract_balance;
 	}
 
 }
