@@ -286,10 +286,8 @@ contract TaskReq{
 	function cancelTask() public payable{
 	   
 	    if ( now > deadline ){
-	       //owner.transfer(req_stake);
-	       tokens._approve(address(this), owner, tokens.balanceOf(address(this)));
-		   tokens.transferFrom(address(this), owner, tokens.balanceOf(address(this)));
-		   selfdestruct(owner);
+	       tokens.transfer(owner, tokens.balanceOf(address(this)));
+	       selfdestruct(owner);
 	    }
 	}
 	
